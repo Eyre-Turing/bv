@@ -24,7 +24,7 @@ pid_t temp_target_pid;
 
 #define BV_SYSCALL_LIST_SIZE	1024
 typedef void (*bv_syscall_type)(pid_t target_pid);
-bv_syscall_type *bv_syscall;
+bv_syscall_type bv_syscall[BV_SYSCALL_LIST_SIZE] = { NULL };
 
 /*
  * bv_syscall[0] means: SYS_read ptrace function
@@ -37,15 +37,10 @@ pthread_mutex_t ptrace_mutex;
 pid_t ready_to_detach_pids[1024];
 int ready_to_detach_pids_len = 0;
 
-void init()
-{
-	bv_syscall = (bv_syscall_type *) calloc(BV_SYSCALL_LIST_SIZE, sizeof(bv_syscall_type));
-}
-
 int load_bv_syscall_module(const char *so_path)
 {
 	void *dl_hdl;
-	int **bv_syscall_list;
+	int (*bv_syscall_list)[];
 	int *bv_syscall_list_len;
 	int i;
 	char buf[1024];
@@ -58,7 +53,7 @@ int load_bv_syscall_module(const char *so_path)
 		return 1;
 	}
 
-	bv_syscall_list = (int **) dlsym(dl_hdl, "bv_syscall_list");
+	bv_syscall_list = (int (*)[]) dlsym(dl_hdl, "bv_syscall_list");
 	bv_syscall_list_len = (int *) dlsym(dl_hdl, "bv_syscall_list_len");
 
 	if (bv_syscall_list == NULL || bv_syscall_list_len == NULL) {
@@ -359,7 +354,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	init();
 	for (p = argv + 1; *p; ++p) {
 		if (strcmp(*p, "daemon") == 0) {
 			use_daemon = 1;
