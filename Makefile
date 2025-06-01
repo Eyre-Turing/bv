@@ -1,7 +1,7 @@
 bv: bvd bvctl
 
 bv%: bv%.c
-	gcc -lpthread -ldl -o $@ $<
+	gcc -ldl -o $@ $<
 
 %.so: module/%
 	cd $< && make

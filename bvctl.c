@@ -11,7 +11,8 @@ void usage(FILE *out, const char *self)
 			"  /path/to/module/file.so  like: /root/test/xxx.so, to load module file\n"
 			"  pid                      like: 1234, to ptrace pid\n"
 			"  -sys_call_num            like: -sys0, to remove ptrace sys call\n"
-			"  -pid                     like: -1234, to remove ptrace pid\n", self);
+			"  -pid                     like: -1234, to remove ptrace pid\n"
+			"  stop                     stop bvd\n", self);
 }
 
 #define MY_WRITE(fd, str_data) write(fd, str_data, strlen(str_data))
@@ -24,16 +25,13 @@ int main(int argc, char *argv[])
 	char buf[1024];
 	int n;
 
-	if (argc == 2) {
-		if (strcmp(argv[1], "help") == 0 || 
-			strcmp(argv[1], "?") == 0 || 
-			strcmp(argv[1], "-h") == 0 || 
-			strcmp(argv[1], "--help") == 0 || 
-			strcmp(argv[1], "-?") == 0) {
-
-			usage(stderr, argv[0]);
-			return 0;
-		}
+	if (argc < 2 || ( argc == 2 && (strcmp(argv[1], "help") == 0 || 
+						strcmp(argv[1], "?") == 0 || 
+						strcmp(argv[1], "-h") == 0 || 
+						strcmp(argv[1], "--help") == 0 || 
+						strcmp(argv[1], "-?") == 0) )) {
+		usage(stderr, argv[0]);
+		return 0;
 	}
 
 	sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
