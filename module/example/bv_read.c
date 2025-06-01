@@ -8,8 +8,7 @@
 #include <sys/ptrace.h>
 #include <sys/user.h>
 #include <stdint.h>
-
-static int read_ctx = 0;
+#include <errno.h>
 
 BV_SYSCALL(0)	// 0 means SYS_read
 {
@@ -27,13 +26,11 @@ BV_SYSCALL(0)	// 0 means SYS_read
 	}
 
 	// regs.rdi, regs.rsi, regs.rdx
-	if (read_ctx == 0) {
-		read_ctx = 1;
+	if (regs.rax == -ENOSYS) {
 		fprintf(stderr, "target_pid: %d\n", target_pid);
 		fprintf(stderr, "read(%d, \"", regs.rdi);
 	}
 	else {
-		read_ctx = 0;
 		for (i = 0; i < (int64_t) regs.rax; i += 8) {
 			data = ptrace(PTRACE_PEEKDATA, target_pid, regs.rsi + i, NULL);
 			if (regs.rax -i >= 8) {
