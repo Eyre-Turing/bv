@@ -27,6 +27,7 @@ int main(int argc, char *argv[])
 	char buf_size_str[16];
 
 	long n, i, data;
+	char data_long_str[65536];
 	char data_str[sizeof(long)];
 	long write_size;
 
@@ -175,13 +176,32 @@ int main(int argc, char *argv[])
 
 				backup_size = 0;
 				buf_new_size = 0;
-				while ( (n = read(pipe_to_me[0], data_str, sizeof(long))) > 0 ) {
+
+				i = 0;
+				while ( (n = read(pipe_to_me[0], data_long_str + i, sizeof(data_long_str))) > 0 ) {
+					n += i;
+					for (i = 0; i + sizeof(long) <= n; i += sizeof(long)) {
+						data = ptrace(PTRACE_PEEKDATA, pid, buf_addr + backup_size, NULL);
+						memcpy(backup_buf + backup_size, &data, sizeof(long));
+						memcpy(&data, data_long_str + i, sizeof(long));
+						ptrace(PTRACE_POKEDATA, pid, buf_addr + backup_size, data);
+						backup_size += sizeof(long);
+						buf_new_size += sizeof(long);
+					}
+					if (i < n) {
+						if (i > 0) {
+							memcpy(data_long_str, data_long_str + i, sizeof(long));
+						}
+						i = n - i;
+					}
+				}
+				if (i > 0) {
 					data = ptrace(PTRACE_PEEKDATA, pid, buf_addr + backup_size, NULL);
 					memcpy(backup_buf + backup_size, &data, sizeof(long));
-					memcpy(&data, data_str, sizeof(long));
+					memcpy(&data, data_long_str, sizeof(long));
 					ptrace(PTRACE_POKEDATA, pid, buf_addr + backup_size, data);
 					backup_size += sizeof(long);
-					buf_new_size += n;
+					buf_new_size += i;
 				}
 
 				close(pipe_to_me[0]);
