@@ -282,7 +282,7 @@ int main(int argc, char *argv[])
 				buf_new_size = 0;
 
 				i = 0;
-				while ( (n = read(pipe_to_me[0], data_long_str + i, sizeof(data_long_str))) > 0 ) {
+				while ( (n = read(pipe_to_me[0], data_long_str + i, sizeof(data_long_str) - i)) > 0 ) {
 					n += i;
 					for (i = 0; i + sizeof(long) <= n; i += sizeof(long)) {
 						data = ptrace(PTRACE_PEEKDATA, pid, buf_addr + pid_backup_data->backup_size, NULL);
@@ -297,6 +297,9 @@ int main(int argc, char *argv[])
 							memcpy(data_long_str, data_long_str + i, sizeof(long));
 						}
 						i = n - i;
+					}
+					else {
+						i = 0;
 					}
 				}
 				if (i > 0) {
