@@ -116,7 +116,7 @@ int free_backup_data(struct proc_backup_data *hair)
 
 int main(int argc, char *argv[])
 {
-	char *pid_str = NULL;
+	char pid_str[16];
 	pid_t pid = -1;
 	pid_t child = -1;
 	long child_long;
@@ -144,7 +144,6 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	pid_str = argv[1];
 	if (sscanf(argv[1], "%d", &pid) != 1) {
 		fprintf(stderr, "pid format error\n");
 		return 1;
@@ -241,6 +240,7 @@ int main(int argc, char *argv[])
 					continue;
 				}
 
+				snprintf(pid_str, sizeof(pid_str), "%d", pid);
 				snprintf(buf_size_str, sizeof(buf_size_str), "%ld", buf_size);
 
 				pipe(pipe_to_script);
