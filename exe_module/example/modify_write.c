@@ -14,6 +14,9 @@ struct proc_backup_data {
 	pid_t pid;
 	char backup_buf[65536];
 	long backup_size;
+	long fd;
+	long buf_addr;
+	long buf_size;
 	struct proc_backup_data *next;
 };
 
@@ -127,7 +130,7 @@ int main(int argc, char *argv[])
 	struct proc_backup_data *pid_backup_data;
 	struct user_regs_struct regs;
 
-	long fd, buf_addr, buf_size, buf_new_size;
+	long buf_new_size;
 	char buf_size_str[16];
 
 	long n, i, data;
@@ -230,18 +233,18 @@ int main(int argc, char *argv[])
 		else if ( regs.orig_rax == SYS_write &&
 			    (pid_backup_data = get_backup_data(&backup_data, pid)) != NULL ) {
 			if (regs.rax == -ENOSYS) {
-				fd = regs.rdi;
-				buf_addr = regs.rsi;
-				buf_size = regs.rdx;
+				pid_backup_data->fd = regs.rdi;
+				pid_backup_data->buf_addr = regs.rsi;
+				pid_backup_data->buf_size = regs.rdx;
 
-				if (buf_size > sizeof(pid_backup_data->backup_buf)) {
-					fprintf(stderr, "buf_size too long (%ld), skip\n", buf_size);
+				if (pid_backup_data->buf_size > sizeof(pid_backup_data->backup_buf)) {
+					fprintf(stderr, "buf_size too long (%ld), skip\n", pid_backup_data->buf_size);
 					ptrace(PTRACE_SYSCALL, pid, NULL, NULL);
 					continue;
 				}
 
 				snprintf(pid_str, sizeof(pid_str), "%d", pid);
-				snprintf(buf_size_str, sizeof(buf_size_str), "%ld", buf_size);
+				snprintf(buf_size_str, sizeof(buf_size_str), "%ld", pid_backup_data->buf_size);
 
 				pipe(pipe_to_script);
 				pipe(pipe_to_me);
@@ -261,20 +264,20 @@ int main(int argc, char *argv[])
 				close(pipe_to_script[0]);
 				close(pipe_to_me[1]);
 
-				fprintf(stderr, "write(%ld, \"", fd);
+				fprintf(stderr, "write(%ld, \"", pid_backup_data->fd);
 
-				for (i = 0; i < buf_size; i += sizeof(long)) {
-					data = ptrace(PTRACE_PEEKDATA, pid, buf_addr + i, NULL);
+				for (i = 0; i < pid_backup_data->buf_size; i += sizeof(long)) {
+					data = ptrace(PTRACE_PEEKDATA, pid, pid_backup_data->buf_addr + i, NULL);
 					memcpy(data_str, &data, sizeof(long));
 					write_size = sizeof(long);
-					if (buf_size - i < write_size) {
-						write_size = buf_size - i;
+					if (pid_backup_data->buf_size - i < write_size) {
+						write_size = pid_backup_data->buf_size - i;
 					}
 					write(pipe_to_script[1], data_str, write_size);
 					write(2, data_str, write_size);
 				}
 
-				fprintf(stderr, "\", %ld)", buf_size);
+				fprintf(stderr, "\", %ld)", pid_backup_data->buf_size);
 
 				close(pipe_to_script[1]);
 
@@ -285,10 +288,10 @@ int main(int argc, char *argv[])
 				while ( (n = read(pipe_to_me[0], data_long_str + i, sizeof(data_long_str) - i)) > 0 ) {
 					n += i;
 					for (i = 0; i + sizeof(long) <= n; i += sizeof(long)) {
-						data = ptrace(PTRACE_PEEKDATA, pid, buf_addr + pid_backup_data->backup_size, NULL);
+						data = ptrace(PTRACE_PEEKDATA, pid, pid_backup_data->buf_addr + pid_backup_data->backup_size, NULL);
 						memcpy(pid_backup_data->backup_buf + pid_backup_data->backup_size, &data, sizeof(long));
 						memcpy(&data, data_long_str + i, sizeof(long));
-						ptrace(PTRACE_POKEDATA, pid, buf_addr + pid_backup_data->backup_size, data);
+						ptrace(PTRACE_POKEDATA, pid, pid_backup_data->buf_addr + pid_backup_data->backup_size, data);
 						pid_backup_data->backup_size += sizeof(long);
 						buf_new_size += sizeof(long);
 					}
@@ -303,10 +306,10 @@ int main(int argc, char *argv[])
 					}
 				}
 				if (i > 0) {
-					data = ptrace(PTRACE_PEEKDATA, pid, buf_addr + pid_backup_data->backup_size, NULL);
+					data = ptrace(PTRACE_PEEKDATA, pid, pid_backup_data->buf_addr + pid_backup_data->backup_size, NULL);
 					memcpy(pid_backup_data->backup_buf + pid_backup_data->backup_size, &data, sizeof(long));
 					memcpy(&data, data_long_str, sizeof(long));
-					ptrace(PTRACE_POKEDATA, pid, buf_addr + pid_backup_data->backup_size, data);
+					ptrace(PTRACE_POKEDATA, pid, pid_backup_data->buf_addr + pid_backup_data->backup_size, data);
 					pid_backup_data->backup_size += sizeof(long);
 					buf_new_size += i;
 				}
@@ -319,17 +322,17 @@ int main(int argc, char *argv[])
 				ptrace(PTRACE_SETREGS, pid, NULL, &regs);
 			}
 			else {
-				if (buf_size > sizeof(pid_backup_data->backup_buf)) {
+				if (pid_backup_data->buf_size > sizeof(pid_backup_data->backup_buf)) {
 					ptrace(PTRACE_SYSCALL, pid, NULL, NULL);
 					continue;
 				}
 				for (i = 0; i < pid_backup_data->backup_size; i += sizeof(long)) {
 					memcpy(&data, pid_backup_data->backup_buf + i, sizeof(long));
-					ptrace(PTRACE_POKEDATA, pid, buf_addr + i, data);
+					ptrace(PTRACE_POKEDATA, pid, pid_backup_data->buf_addr + i, data);
 				}
-				regs.rax = buf_size;
+				regs.rax = pid_backup_data->buf_size;
 				ptrace(PTRACE_SETREGS, pid, NULL, &regs);
-				fprintf(stderr, " = %ld\n", buf_size);
+				fprintf(stderr, " = %ld\n", pid_backup_data->buf_size);
 			}
 		}
 
