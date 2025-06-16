@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
 	int pipe_to_script[2], pipe_to_me[2];
 	int status = 0;
 	char *script = NULL;
-	struct proc_backup_data backup_data;
+	struct proc_backup_data backup_data = {0};
 	struct proc_backup_data *pid_backup_data;
 	struct user_regs_struct regs;
 
